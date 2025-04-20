@@ -24,9 +24,6 @@ mod evdev_utils;
 mod config_file;
 mod deviceinfo;
 
-// TODO
-// - key press logger with device selection
-
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
 fn main() {
