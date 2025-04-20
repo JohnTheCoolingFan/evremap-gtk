@@ -1,0 +1,15 @@
+[package]
+name = "evremap-gtk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.97"
+evdev-rs = { version = "0.6.1", features = ["serde"] }
+gtk = { version = "0.9.6", package = "gtk4", features = ["v4_16"]}
+log = "0.4.27"
+relm4 = { version = "0.9.1", features = ["gnome_47", "libadwaita"] }
+relm4-components = { version = "0.9.1", features = ["libadwaita"] }
+serde = { version = "1.0.219", features = ["derive"] }
+thiserror = "2.0.12"
+toml = "0.8.20"
