@@ -22,6 +22,9 @@ mod evdev_utils;
 mod config_file;
 mod deviceinfo;
 
+// TODO:
+//  - Warning if there are multiple devices with same name and phys is not set
+
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
 fn main() {
