@@ -4,8 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail};
 use evdev_rs::{Device, DeviceWrapper};
+use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct DeviceInfo {
@@ -14,11 +14,25 @@ pub struct DeviceInfo {
     pub path: PathBuf,
 }
 
+#[derive(Debug, Error)]
+pub enum DeviceInfoError {
+    #[error("Error opening file at {0:?}: {1}")]
+    FileOpenError(PathBuf, std::io::Error),
+    #[error("Filesystem error: {0}")]
+    IoError(std::io::Error),
+    #[error("evdev error: {0}")]
+    EvdevError(std::io::Error),
+    #[error("Device with name `{0} not found`")]
+    DeviceNotFoundByName(String),
+    #[error("Device with name `{0}` and phys `{1}` not found")]
+    DeviceNotFound(String, String),
+}
+
 impl DeviceInfo {
-    pub fn with_path(path: PathBuf) -> Result<Self> {
-        let f = std::fs::File::open(&path).context(format!("opening {}", path.display()))?;
-        let input = Device::new_from_file(f)
-            .with_context(|| format!("failed to create new Device from file {}", path.display()))?;
+    pub fn with_path(path: PathBuf) -> Result<Self, DeviceInfoError> {
+        let f = std::fs::File::open(&path)
+            .map_err(|e| DeviceInfoError::FileOpenError(path.clone(), e))?;
+        let input = Device::new_from_file(f).map_err(DeviceInfoError::EvdevError)?;
 
         Ok(Self {
             name: input.name().unwrap_or("").to_string(),
@@ -27,23 +41,22 @@ impl DeviceInfo {
         })
     }
 
-    pub fn with_name(name: &str, phys: Option<&str>) -> Result<Self> {
+    pub fn with_name(name: &str, phys: Option<&str>) -> Result<Self, DeviceInfoError> {
         let mut devices = Self::obtain_device_list()?;
 
-        if let Some(phys) = phys {
+        if let Some(query_phys) = phys {
             match devices.iter().position(|item| {
                 item.phys
                     .as_ref()
-                    .map(|devphys| devphys == phys)
+                    .map(|devphys| devphys == query_phys)
                     .unwrap_or(false)
             }) {
                 Some(idx) => return Ok(devices.remove(idx)),
                 None => {
-                    bail!(
-                        "Requested device `{}` with phys=`{}` was not found",
-                        name,
-                        phys
-                    );
+                    return Err(DeviceInfoError::DeviceNotFound(
+                        name.to_owned(),
+                        query_phys.to_owned(),
+                    ));
                 }
             }
         }
@@ -54,7 +67,7 @@ impl DeviceInfo {
             .collect();
 
         if devices_with_name.is_empty() {
-            bail!("No device found with name `{}`", name);
+            return Err(DeviceInfoError::DeviceNotFoundByName(name.to_owned()));
         }
 
         if devices_with_name.len() > 1 {
@@ -74,10 +87,10 @@ impl DeviceInfo {
         Ok(devices_with_name.remove(0))
     }
 
-    pub fn obtain_device_list() -> Result<Vec<DeviceInfo>> {
+    pub fn obtain_device_list() -> Result<Vec<DeviceInfo>, DeviceInfoError> {
         let mut devices = vec![];
-        for entry in std::fs::read_dir("/dev/input")? {
-            let entry = entry?;
+        for entry in std::fs::read_dir("/dev/input").map_err(DeviceInfoError::IoError)? {
+            let entry = entry.map_err(DeviceInfoError::IoError)?;
 
             if !entry
                 .file_name()

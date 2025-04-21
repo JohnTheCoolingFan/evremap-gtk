@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.97"
 evdev-rs = { version = "0.6.1", features = ["serde"] }
+glib = { version = "0.20.9", features = ["log"] }
 gtk = { version = "0.9.6", package = "gtk4", features = ["v4_16"]}
 log = "0.4.27"
 relm4 = { version = "0.9.1", features = ["gnome_47", "libadwaita"] }

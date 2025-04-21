@@ -8,11 +8,11 @@ use crate::evdev_utils::{KeyCode, list_keycodes};
 
 #[derive(Debug, Error)]
 pub enum ConfigFileError {
-    #[error("IO error")]
+    #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Parsing error")]
+    #[error("Parsing error: {0}")]
     TomlDeserialize(#[from] toml::de::Error),
-    #[error("Serialization error")]
+    #[error("Serialization error: {0}")]
     TomlSerialize(#[from] toml::ser::Error),
 }
 
