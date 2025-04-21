@@ -25,6 +25,7 @@ mod deviceinfo;
 
 // TODO:
 //  - Warning if there are multiple devices with same name and phys is not set
+//  - Error reporting in GUI instead of unwraps where makes sense
 
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
