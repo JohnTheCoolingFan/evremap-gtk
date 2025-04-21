@@ -1,0 +1,3 @@
+[env]
+G_MESSAGES_DEBUG="evremap_gtk"
+RUST_LOG="debug"

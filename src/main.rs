@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use components::{
     device_browser::{DeviceDisplay, DeviceDisplayOutput},
@@ -9,7 +9,8 @@ use components::{
 };
 use config_file::{ConfigFile, DualRoleConfig, RemapConfig};
 use deviceinfo::DeviceInfo;
-use gtk::{self, prelude::*};
+use gtk::{self, glib, prelude::*};
+use log::LevelFilter;
 use relm4::{factory::FactoryVecDequeGuard, prelude::*};
 use relm4_components::{
     open_dialog::{OpenDialog, OpenDialogMsg, OpenDialogResponse, OpenDialogSettings},
@@ -27,7 +28,31 @@ mod deviceinfo;
 
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
+fn init_logging() {
+    static GLIB_LOGGER: glib::GlibLogger = glib::GlibLogger::new(
+        glib::GlibLoggerFormat::Plain,
+        glib::GlibLoggerDomain::CrateTarget,
+    );
+
+    let log_level = std::env::var("RUST_LOG")
+        .ok()
+        .and_then(|lvl| {
+            LevelFilter::from_str(&lvl)
+                .inspect_err(|e| {
+                    println!("Failed to parse the supplied log level: {e}");
+                })
+                .ok()
+        })
+        .unwrap_or(LevelFilter::Warn);
+
+    let _ = log::set_logger(&GLIB_LOGGER);
+    log::set_max_level(log_level);
+
+    log::debug!("Logging set up finished!")
+}
+
 fn main() {
+    init_logging();
     let app = RelmApp::new(APP_ID);
     relm4::set_global_css(
         ".device-list-refresh-button {
