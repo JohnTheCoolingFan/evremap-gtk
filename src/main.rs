@@ -28,6 +28,13 @@ mod deviceinfo;
 //  - Filter out the devices that don't have remappable inputs, such as audio devices. With ability
 //    to show such devices if desired by the user
 //  - Checking and formatting of key sequences/combinations like in evremap internally
+//  - Localized key names? Would be a big change, as a support for localizations woudl be needed,
+//    but in theory adding localizations of other parts of the application wouldn't be so hard after
+//    that. The biggest problem would be collecting enough localizations. For keys, there are
+//    probably pre-existing localizations, such as for GNOME's settings interface. Same could be
+//    said about teh usual buttons such as "Save As" and "Open". The chances for finding good
+//    pre-existing localizations for otehr messages and labels are neraly 0, and I can only provide
+//    english and russian myself.
 
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
