@@ -1,4 +1,4 @@
-use std::{env::VarError, path::PathBuf, str::FromStr};
+use std::{env::VarError, error::Error, fmt::Display, path::PathBuf, str::FromStr};
 
 use components::{
     device_browser::{DeviceDisplay, DeviceDisplayOutput},
@@ -11,7 +11,7 @@ use config_file::{ConfigFile, DualRoleConfig, RemapConfig};
 use deviceinfo::DeviceInfo;
 use gtk::{self, glib, prelude::*};
 use log::LevelFilter;
-use relm4::{factory::FactoryVecDequeGuard, prelude::*};
+use relm4::{abstractions::Toaster, adw, factory::FactoryVecDequeGuard, prelude::*};
 use relm4_components::{
     open_dialog::{OpenDialog, OpenDialogMsg, OpenDialogResponse, OpenDialogSettings},
     save_dialog::{SaveDialog, SaveDialogMsg, SaveDialogResponse, SaveDialogSettings},
@@ -133,6 +133,7 @@ struct AppModel {
     save_dialog: Controller<SaveDialog>,
     device_browser: FactoryVecDeque<DeviceDisplay>,
     event_logger: Controller<EventLogger>,
+    toaster: Toaster,
 }
 
 #[derive(Debug)]
@@ -157,6 +158,11 @@ enum AppMsg {
     RefreshDevices,
     /// Set the device for event logging
     SetLoggerDevice(DeviceInfo),
+    /// Display an error in the UI
+    ReportError {
+        error: Box<dyn Error + Send + 'static>,
+        extra_context: Option<String>,
+    },
 }
 
 #[relm4::component]
@@ -190,93 +196,98 @@ impl Component for AppModel {
                 },
             },
 
-            #[name(contents_stack)]
-            gtk::Stack {
-                add_child = &gtk::Box {
-                    set_orientation: gtk::Orientation::Vertical,
-                    set_spacing: 12,
-                    set_margin_all: 12,
+            #[local_ref]
+            toast_overlay -> adw::ToastOverlay {
+                set_vexpand: true,
 
-                    #[name = "device_name_entry"]
-                    gtk::Entry {
-                        set_placeholder_text: Some("Device name (required)"),
-                        set_buffer: &model.config.name,
-                        connect_changed => AppMsg::Ignore,
+                #[name(contents_stack)]
+                gtk::Stack {
+                    add_child = &gtk::Box {
+                        set_orientation: gtk::Orientation::Vertical,
+                        set_spacing: 12,
+                        set_margin_all: 12,
+
+                        #[name = "device_name_entry"]
+                        gtk::Entry {
+                            set_placeholder_text: Some("Device name (required)"),
+                            set_buffer: &model.config.name,
+                            connect_changed => AppMsg::Ignore,
+                        },
+                        gtk::Entry {
+                            set_placeholder_text: Some("Device phys (optional)"),
+                            set_buffer: &model.config.phys,
+                        },
+
+                        gtk::Separator::new(gtk::Orientation::Horizontal),
+
+
+                        gtk::ScrolledWindow {
+                            set_vexpand: true,
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                                set_spacing: 12,
+
+                                gtk::Button {
+                                    set_label: "Add remap",
+                                    connect_clicked => AppMsg::AddRemap,
+                                },
+
+                                #[local_ref]
+                                remaps_box -> gtk::Box {
+                                    set_orientation: gtk::Orientation::Vertical,
+                                    set_spacing: 6,
+                                },
+
+                                gtk::Separator::new(gtk::Orientation::Horizontal),
+
+                                gtk::Button {
+                                    set_label: "Add dual-role remap",
+                                    connect_clicked => AppMsg::AddDualRoleRemap,
+                                },
+
+                                #[local_ref]
+                                dual_role_box -> gtk::Box {
+                                    set_orientation: gtk::Orientation::Vertical,
+                                    set_spacing: 6,
+                                },
+                            }
+                        }
+                    } -> {
+                        set_name: "editor",
+                        set_title: "Editor"
                     },
-                    gtk::Entry {
-                        set_placeholder_text: Some("Device phys (optional)"),
-                        set_buffer: &model.config.phys,
-                    },
 
-                    gtk::Separator::new(gtk::Orientation::Horizontal),
+                    add_child = &gtk::Box {
+                        set_orientation: gtk::Orientation::Vertical,
 
+                        gtk::Button::from_icon_name("view-refresh-symbolic") {
+                            set_tooltip_text: Some("Refresh device list"),
+                            set_has_frame: false,
+                            add_css_class: "device-list-refresh-button",
+                            connect_clicked => AppMsg::RefreshDevices,
+                        },
 
-                    gtk::ScrolledWindow {
-                        set_vexpand: true,
-                        gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            set_spacing: 12,
-
-                            gtk::Button {
-                                set_label: "Add remap",
-                                connect_clicked => AppMsg::AddRemap,
-                            },
+                        gtk::ScrolledWindow {
+                            set_vexpand: true,
 
                             #[local_ref]
-                            remaps_box -> gtk::Box {
+                            device_browser_box -> gtk::Box {
                                 set_orientation: gtk::Orientation::Vertical,
-                                set_spacing: 6,
-                            },
-
-                            gtk::Separator::new(gtk::Orientation::Horizontal),
-
-                            gtk::Button {
-                                set_label: "Add dual-role remap",
-                                connect_clicked => AppMsg::AddDualRoleRemap,
-                            },
-
-                            #[local_ref]
-                            dual_role_box -> gtk::Box {
-                                set_orientation: gtk::Orientation::Vertical,
-                                set_spacing: 6,
-                            },
+                                set_margin_all: 12,
+                                set_spacing: 12,
+                            }
                         }
-                    }
-                } -> {
-                    set_name: "editor",
-                    set_title: "Editor"
-                },
-
-                add_child = &gtk::Box {
-                    set_orientation: gtk::Orientation::Vertical,
-
-                    gtk::Button::from_icon_name("view-refresh-symbolic") {
-                        set_tooltip_text: Some("Refresh device list"),
-                        set_has_frame: false,
-                        add_css_class: "device-list-refresh-button",
-                        connect_clicked => AppMsg::RefreshDevices,
+                    } -> {
+                        set_name: "devbrowser",
+                        set_title: "Devices"
                     },
 
-                    gtk::ScrolledWindow {
-                        set_vexpand: true,
-
-                        #[local_ref]
-                        device_browser_box -> gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
-                            set_margin_all: 12,
-                            set_spacing: 12,
-                        }
-                    }
-                } -> {
-                    set_name: "devbrowser",
-                    set_title: "Devices"
-                },
-
-                #[local_ref]
-                add_child = event_logger_box -> gtk::Box {} -> {
-                    set_name: "event_logger",
-                    set_title: "Events"
-                },
+                    #[local_ref]
+                    add_child = event_logger_box -> gtk::Box {} -> {
+                        set_name: "event_logger",
+                        set_title: "Events"
+                    },
+                }
             }
         }
     }
@@ -333,12 +344,14 @@ impl Component for AppModel {
             open_dialog,
             device_browser,
             event_logger,
+            toaster: Toaster::default(),
         };
 
         let remaps_box = model.remaps.widget();
         let dual_role_box = model.dual_role_remaps.widget();
         let device_browser_box = model.device_browser.widget();
         let event_logger_box = model.event_logger.widget();
+        let toast_overlay = model.toaster.overlay_widget();
         let widgets = view_output!();
 
         relm4::ComponentParts { model, widgets }
@@ -383,6 +396,26 @@ impl Component for AppModel {
             }
             AppMsg::SetLoggerDevice(dev) => {
                 self.event_logger.emit(EventLoggerMsg::SetDevice(dev));
+            }
+            AppMsg::ReportError {
+                error,
+                extra_context,
+            } => {
+                let error_msg = match extra_context {
+                    Some(ctx) => {
+                        format!("{ctx}: {error}")
+                    }
+                    None => {
+                        format!("Error occured: {error}")
+                    }
+                };
+                let toast = adw::Toast::builder()
+                    .title(&error_msg)
+                    .button_label("Dismiss")
+                    .timeout(10)
+                    .build();
+                toast.connect_button_clicked(move |tst| tst.dismiss());
+                self.toaster.add_toast(toast);
             }
         }
     }
