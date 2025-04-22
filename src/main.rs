@@ -75,6 +75,8 @@ fn main() {
     app.run::<AppModel>(());
 }
 
+/// Contains the entry buffers for the device name and phys text entries, stored in the [`AppModel`]
+/// for easy access when needed for saving
 #[derive(Debug, Default)]
 struct ConfigFileGtkBuf {
     name: gtk::EntryBuffer,
@@ -82,6 +84,7 @@ struct ConfigFileGtkBuf {
 }
 
 impl ConfigFileGtkBuf {
+    /// Update the entry buffers from a parsed config file
     fn update_from_file(&self, file: &ConfigFile) {
         if let Some(name) = &file.device_name {
             self.name.set_text(name);
@@ -95,6 +98,8 @@ impl ConfigFileGtkBuf {
         }
     }
 
+    /// Extract text from entry buffers and add the remap configs to form a config file for later
+    /// saving it
     fn to_config_file(
         &self,
         remap: Vec<RemapConfig>,
@@ -115,6 +120,7 @@ impl ConfigFileGtkBuf {
 
 #[derive(Debug)]
 enum CommandMsg {
+    /// Update the list of devices in the browser
     UpdateDeviceList(Vec<DeviceInfo>),
 }
 
@@ -131,17 +137,25 @@ struct AppModel {
 
 #[derive(Debug)]
 enum AppMsg {
+    /// Message to trigger a redraw, completely ignored otherwise
     Ignore,
+    /// Request to save the config, triggered by the "Save As" button
     SaveRequest,
+    /// User has selected a file to save the config to
     SaveResponse(PathBuf),
+    /// Request to open a config file from disk
     OpenRequest,
+    /// User has selected a config file to parse
     OpenResponse(PathBuf),
     AddRemap,
     DeleteRemap(DynamicIndex),
     AddDualRoleRemap,
     DeleteDualRoleRemap(DynamicIndex),
+    /// Copy the device's name and phys to the editor
     SetDevice(DeviceInfo),
+    /// Request to update teh list of devices
     RefreshDevices,
+    /// Set the device for event logging
     SetLoggerDevice(DeviceInfo),
 }
 
@@ -392,6 +406,7 @@ impl Component for AppModel {
 }
 
 impl AppModel {
+    /// Load config data from a parsed config file
     fn load(&mut self, config_file: ConfigFile) {
         self.config.update_from_file(&config_file);
         let ConfigFile {
@@ -464,6 +479,7 @@ impl AppModel {
         }
     }
 
+    /// Collect the data from buffers and factories to form a config file for saving
     fn to_config_file(&self) -> ConfigFile {
         let remaps = self.remaps_extract();
         let dual_remaps = self.dual_remaps_extract();
