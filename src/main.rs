@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{env::VarError, path::PathBuf, str::FromStr};
 
 use components::{
     device_browser::{DeviceDisplay, DeviceDisplayOutput},
@@ -29,7 +29,16 @@ mod deviceinfo;
 
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
+/// Initialize logging for the `log` crate via glib's logging
 fn init_logging() {
+    if let Err(VarError::NotPresent) = std::env::var("G_MESSAGES_DEBUG") {
+        // SAFETY: first function called in `main`, no other threads are spawned yet, including
+        // those possibly spawned by starting the gtk/relm4 application
+        unsafe {
+            std::env::set_var("G_MESSAGES_DEBUG", "evremap_gtk");
+        }
+    }
+
     static GLIB_LOGGER: glib::GlibLogger = glib::GlibLogger::new(
         glib::GlibLoggerFormat::Plain,
         glib::GlibLoggerDomain::CrateTarget,
