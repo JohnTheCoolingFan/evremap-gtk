@@ -27,6 +27,7 @@ mod deviceinfo;
 //  - Warning if there are multiple devices with same name and phys is not set
 //  - Filter out the devices that don't have remappable inputs, such as audio devices. With ability
 //    to show such devices if desired by the user
+//  - Checking and formatting of key sequences/combinations like in evremap internally
 
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
