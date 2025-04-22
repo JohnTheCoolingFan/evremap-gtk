@@ -1,4 +1,4 @@
-use std::{env::VarError, error::Error, fmt::Display, path::PathBuf, str::FromStr};
+use std::{env::VarError, error::Error, path::PathBuf, str::FromStr};
 
 use components::{
     device_browser::{DeviceDisplay, DeviceDisplayOutput},
