@@ -3,7 +3,7 @@ use std::{env::VarError, error::Error, fmt::Display, path::PathBuf, str::FromStr
 use components::{
     device_browser::{DeviceDisplay, DeviceDisplayOutput},
     dual_role::{DualRoleMapItem, DualRoleMapItemOutput},
-    event_logger::{EventLogger, EventLoggerMsg},
+    event_logger::{EventLogger, EventLoggerMsg, EventLoggerOutput},
     key_seq::KeySeqInputMsg,
     remap::{RemapItem, RemapItemOutput},
 };
@@ -122,6 +122,7 @@ impl ConfigFileGtkBuf {
 enum CommandMsg {
     /// Update the list of devices in the browser
     UpdateDeviceList(Vec<DeviceInfo>),
+    DeviceListRefreshError(Box<dyn Error + Send + 'static>),
 }
 
 #[derive(Debug)]
@@ -163,6 +164,15 @@ enum AppMsg {
         error: Box<dyn Error + Send + 'static>,
         extra_context: Option<String>,
     },
+}
+
+impl AppMsg {
+    pub fn err_msg<E: Error + Send + 'static, S: Into<String>>(e: E, msg: Option<S>) -> AppMsg {
+        AppMsg::ReportError {
+            error: Box::new(e),
+            extra_context: msg.map(Into::into),
+        }
+    }
 }
 
 #[relm4::component]
@@ -313,7 +323,15 @@ impl Component for AppModel {
                 OpenDialogResponse::Accept(path) => AppMsg::OpenResponse(path),
             });
 
-        let event_logger = EventLogger::builder().launch(None).detach();
+        let event_logger =
+            EventLogger::builder()
+                .launch(None)
+                .forward(sender.input_sender(), |out| match out {
+                    EventLoggerOutput::ErrorOccured(e, msg) => AppMsg::ReportError {
+                        error: e,
+                        extra_context: msg,
+                    },
+                });
 
         let remaps = FactoryVecDeque::builder()
             .launch(gtk::Box::default())
@@ -361,12 +379,16 @@ impl Component for AppModel {
         match message {
             AppMsg::Ignore => {}
             AppMsg::SaveRequest => self.save_dialog.emit(SaveDialogMsg::Save),
-            AppMsg::SaveResponse(path) => self.to_config_file().save_to(path).unwrap(),
-            AppMsg::OpenRequest => self.open_dialog.emit(OpenDialogMsg::Open),
-            AppMsg::OpenResponse(path) => {
-                let config = ConfigFile::read_from(path).unwrap();
-                self.load(config);
+            AppMsg::SaveResponse(path) => {
+                if let Err(e) = self.to_config_file().save_to(path) {
+                    sender.input(AppMsg::err_msg(e, Some("Failed to save config file")))
+                }
             }
+            AppMsg::OpenRequest => self.open_dialog.emit(OpenDialogMsg::Open),
+            AppMsg::OpenResponse(path) => match ConfigFile::read_from(path) {
+                Ok(config) => self.load(config),
+                Err(e) => sender.input(AppMsg::err_msg(e, Some("Failed to open selected file"))),
+            },
             AppMsg::AddRemap => {
                 self.remaps.guard().push_back(RemapConfig::default());
             }
@@ -390,8 +412,9 @@ impl Component for AppModel {
                 }
             }
             AppMsg::RefreshDevices => {
-                sender.spawn_oneshot_command(|| {
-                    CommandMsg::UpdateDeviceList(DeviceInfo::obtain_device_list().unwrap())
+                sender.spawn_oneshot_command(|| match DeviceInfo::obtain_device_list() {
+                    Ok(devices) => CommandMsg::UpdateDeviceList(devices),
+                    Err(e) => CommandMsg::DeviceListRefreshError(Box::new(e)),
                 });
             }
             AppMsg::SetLoggerDevice(dev) => {
@@ -423,7 +446,7 @@ impl Component for AppModel {
     fn update_cmd(
         &mut self,
         message: Self::CommandOutput,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
         _root: &Self::Root,
     ) {
         match message {
@@ -434,6 +457,10 @@ impl Component for AppModel {
                     device_list.push_back(dev);
                 }
             }
+            CommandMsg::DeviceListRefreshError(e) => sender.input(AppMsg::ReportError {
+                error: e,
+                extra_context: Some("Failed to refresh the device list".to_owned()),
+            }),
         }
     }
 }

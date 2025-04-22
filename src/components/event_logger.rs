@@ -1,8 +1,8 @@
-use std::sync::mpsc;
+use std::{error::Error, sync::mpsc};
 
 use evdev_rs::enums::EventCode;
 use gtk::prelude::*;
-use relm4::prelude::*;
+use relm4::{Sender, prelude::*};
 
 use crate::{deviceinfo::DeviceInfo, evdev_utils::KeyCode};
 
@@ -36,13 +36,19 @@ pub enum EventLoggerMsg {
 #[derive(Debug)]
 pub enum EventCommandMsg {
     NewEvent(KeyCode, i32),
+    ErrorOccured(std::io::Error),
+}
+
+#[derive(Debug)]
+pub enum EventLoggerOutput {
+    ErrorOccured(Box<dyn Error + Send + 'static>, Option<String>),
 }
 
 #[relm4::component(pub)]
 impl Component for EventLogger {
     type Init = Option<DeviceInfo>;
     type Input = EventLoggerMsg;
-    type Output = ();
+    type Output = EventLoggerOutput;
     type CommandOutput = EventCommandMsg;
 
     view! {
@@ -187,7 +193,7 @@ impl Component for EventLogger {
     fn update_cmd(
         &mut self,
         message: Self::CommandOutput,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
         _root: &Self::Root,
     ) {
         match message {
@@ -198,11 +204,47 @@ impl Component for EventLogger {
                     self.text_buf.insert(&mut end_iter, &new_text);
                 }
             }
+            EventCommandMsg::ErrorOccured(e) => sender
+                .output(EventLoggerOutput::ErrorOccured(
+                    Box::new(e),
+                    Some("Event logger error".to_owned()),
+                ))
+                .unwrap(),
         }
     }
 }
 
 impl EventLogger {
+    fn event_logger_task(
+        cmd_sender: Sender<EventCommandMsg>,
+        dev: DeviceInfo,
+        bg_recv: mpsc::Receiver<BgTaskMsg>,
+    ) -> std::io::Result<()> {
+        let dev_f = std::fs::File::open(&dev.path)?;
+        let input_dev = evdev_rs::Device::new_from_file(dev_f)?;
+
+        loop {
+            match bg_recv.try_recv() {
+                Ok(BgTaskMsg::Stop) => break,
+                Err(mpsc::TryRecvError::Disconnected) => break,
+                _ => {}
+            }
+            let (status, event) =
+                input_dev.next_event(evdev_rs::ReadFlag::NORMAL | evdev_rs::ReadFlag::BLOCKING)?;
+            match status {
+                evdev_rs::ReadStatus::Success => {
+                    if let EventCode::EV_KEY(key) = event.event_code {
+                        cmd_sender
+                            .send(EventCommandMsg::NewEvent(key, event.value))
+                            .unwrap();
+                    }
+                }
+                evdev_rs::ReadStatus::Sync => break,
+            }
+        }
+        Ok(())
+    }
+
     fn set_device(&mut self, dev: DeviceInfo, sender: ComponentSender<Self>) {
         self.is_paused = true;
         self.text_buf.set_text("");
@@ -212,28 +254,9 @@ impl EventLogger {
             bg_task_sender: bg_sender,
         });
         sender.spawn_command(move |cmd_sender| {
-            let dev_f = std::fs::File::open(&dev.path).unwrap();
-            let input_dev = evdev_rs::Device::new_from_file(dev_f).unwrap();
-
-            loop {
-                match bg_recv.try_recv() {
-                    Ok(BgTaskMsg::Stop) => break,
-                    Err(mpsc::TryRecvError::Disconnected) => break,
-                    _ => {}
-                }
-                let (status, event) = input_dev
-                    .next_event(evdev_rs::ReadFlag::NORMAL | evdev_rs::ReadFlag::BLOCKING)
-                    .unwrap();
-                match status {
-                    evdev_rs::ReadStatus::Success => {
-                        if let EventCode::EV_KEY(key) = event.event_code {
-                            cmd_sender
-                                .send(EventCommandMsg::NewEvent(key, event.value))
-                                .unwrap();
-                        }
-                    }
-                    evdev_rs::ReadStatus::Sync => break,
-                }
+            let res = Self::event_logger_task(cmd_sender.clone(), dev, bg_recv);
+            if let Err(e) = res {
+                let _ = cmd_sender.send(EventCommandMsg::ErrorOccured(e));
             }
         });
     }
