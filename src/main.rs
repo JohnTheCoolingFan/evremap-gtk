@@ -25,8 +25,6 @@ mod deviceinfo;
 
 // TODO:
 //  - Warning if there are multiple devices with same name and phys is not set
-//  - Filter out the devices that don't have remappable inputs, such as audio devices. With ability
-//    to show such devices if desired by the user
 //  - Checking and formatting of key sequences/combinations like in evremap internally
 //  - Localized key names? Would be a big change, as a support for localizations woudl be needed,
 //    but in theory adding localizations of other parts of the application wouldn't be so hard after
