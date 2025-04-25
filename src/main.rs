@@ -1,7 +1,7 @@
 use std::{env::VarError, error::Error, path::PathBuf, str::FromStr};
 
 use components::{
-    device_browser::{DeviceDisplay, DeviceDisplayOutput},
+    device_browser::{DeviceDisplay, DeviceDisplayMsg, DeviceDisplayOutput},
     dual_role::{DualRoleMapItem, DualRoleMapItemOutput},
     event_logger::{EventLogger, EventLoggerMsg, EventLoggerOutput},
     key_seq::KeySeqInputMsg,
@@ -173,6 +173,8 @@ enum AppMsg {
         error: Box<dyn Error + Send + 'static>,
         extra_context: Option<String>,
     },
+    ShowHiddenDevices,
+    HideUselessDevices,
 }
 
 impl AppMsg {
@@ -239,7 +241,6 @@ impl Component for AppModel {
 
                         gtk::Separator::new(gtk::Orientation::Horizontal),
 
-
                         gtk::ScrolledWindow {
                             set_vexpand: true,
                             gtk::Box {
@@ -278,6 +279,24 @@ impl Component for AppModel {
 
                     add_child = &gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
+
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Vertical,
+                            set_spacing: 6,
+                            set_margin_all: 6,
+
+                            #[name(hidden_devs_toggle)]
+                            gtk::CheckButton::with_label("Hide devices without supported events") {
+                                set_active: true,
+                                connect_toggled[sender] => move |cb| {
+                                    sender.input(
+                                    match cb.is_active() {
+                                        true => AppMsg::HideUselessDevices,
+                                        false => AppMsg::ShowHiddenDevices,
+                                    })
+                                }
+                            }
+                        },
 
                         gtk::Button::from_icon_name("view-refresh-symbolic") {
                             set_tooltip_text: Some("Refresh device list"),
@@ -432,22 +451,12 @@ impl Component for AppModel {
             AppMsg::ReportError {
                 error,
                 extra_context,
-            } => {
-                let error_msg = match extra_context {
-                    Some(ctx) => {
-                        format!("{ctx}: {error}")
-                    }
-                    None => {
-                        format!("Error occured: {error}")
-                    }
-                };
-                let toast = adw::Toast::builder()
-                    .title(&error_msg)
-                    .button_label("Dismiss")
-                    .timeout(10)
-                    .build();
-                toast.connect_button_clicked(move |tst| tst.dismiss());
-                self.toaster.add_toast(toast);
+            } => self.show_error_toast(error, extra_context),
+            AppMsg::ShowHiddenDevices => {
+                self.device_browser.broadcast(DeviceDisplayMsg::ShowHidden)
+            }
+            AppMsg::HideUselessDevices => {
+                self.device_browser.broadcast(DeviceDisplayMsg::HideUseless)
             }
         }
     }
@@ -574,5 +583,23 @@ impl AppModel {
                 tap: dual_role.tap_seq.model().sequence.clone(),
             })
             .collect()
+    }
+
+    fn show_error_toast(&self, error: Box<dyn Error + Send + 'static>, ctx: Option<String>) {
+        let error_msg = match ctx {
+            Some(ctx) => {
+                format!("{ctx}: {error}")
+            }
+            None => {
+                format!("Error occured: {error}")
+            }
+        };
+        let toast = adw::Toast::builder()
+            .title(&error_msg)
+            .button_label("Dismiss")
+            .timeout(10)
+            .build();
+        toast.connect_button_clicked(move |tst| tst.dismiss());
+        self.toaster.add_toast(toast);
     }
 }

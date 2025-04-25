@@ -6,6 +6,13 @@ use crate::deviceinfo::DeviceInfo;
 #[derive(Debug, Clone)]
 pub struct DeviceDisplay {
     device: DeviceInfo,
+    hidden: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DeviceDisplayMsg {
+    ShowHidden,
+    HideUseless,
 }
 
 #[derive(Debug)]
@@ -17,7 +24,7 @@ pub enum DeviceDisplayOutput {
 #[relm4::factory(pub)]
 impl FactoryComponent for DeviceDisplay {
     type Init = DeviceInfo;
-    type Input = ();
+    type Input = DeviceDisplayMsg;
     type Output = DeviceDisplayOutput;
     type CommandOutput = ();
     type ParentWidget = gtk::Box;
@@ -25,6 +32,8 @@ impl FactoryComponent for DeviceDisplay {
     view! {
         #[root]
         gtk::Frame {
+            #[watch]
+            set_visible: !self.hidden || self.device.supports_remap,
             set_hexpand: true,
 
             gtk::Grid {
@@ -86,6 +95,16 @@ impl FactoryComponent for DeviceDisplay {
     }
 
     fn init_model(init: Self::Init, _index: &Self::Index, _sender: FactorySender<Self>) -> Self {
-        Self { device: init }
+        Self {
+            device: init,
+            hidden: true,
+        }
+    }
+
+    fn update(&mut self, message: Self::Input, _sender: FactorySender<Self>) {
+        match message {
+            DeviceDisplayMsg::ShowHidden => self.hidden = false,
+            DeviceDisplayMsg::HideUseless => self.hidden = true,
+        }
     }
 }

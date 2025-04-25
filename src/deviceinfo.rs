@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use evdev_rs::{Device, DeviceWrapper};
+use evdev_rs::{Device, DeviceWrapper, enums::EventType};
 use thiserror::Error;
 
 #[derive(Debug, Clone)]
@@ -12,6 +12,7 @@ pub struct DeviceInfo {
     pub name: String,
     pub phys: Option<String>,
     pub path: PathBuf,
+    pub supports_remap: bool,
 }
 
 #[derive(Debug, Error)]
@@ -38,6 +39,7 @@ impl DeviceInfo {
             name: input.name().unwrap_or("").to_string(),
             phys: input.phys().map(|s| s.to_owned()),
             path,
+            supports_remap: input.has_event_type(&EventType::EV_KEY),
         })
     }
 
