@@ -8,30 +8,60 @@ use crate::{
 };
 
 #[derive(Debug)]
+struct KeyButton {
+    key: KeyCode,
+}
+
+#[derive(Debug)]
+enum KeyButtonOutput {
+    Remove(KeyCode),
+}
+
+#[relm4::factory]
+impl FactoryComponent for KeyButton {
+    type Init = KeyCode;
+    type Input = ();
+    type Output = KeyButtonOutput;
+    type ParentWidget = gtk::Box;
+    type CommandOutput = ();
+
+    view! {
+        #[root]
+        gtk::Button {
+            set_label: &format!("{}", EventCode::EV_KEY(self.key)),
+            set_tooltip_text: Some("Click to remove the key"),
+            connect_clicked[sender, keycode = self.key] => move |_| {
+                sender.output(KeyButtonOutput::Remove(keycode)).unwrap()
+            }
+        }
+    }
+
+    fn init_model(init: Self::Init, _index: &Self::Index, _sender: FactorySender<Self>) -> Self {
+        Self { key: init }
+    }
+}
+
+#[derive(Debug)]
 pub struct KeySeqInput {
     pub sequence: KeyCombination,
+    keys_factory: FactoryVecDeque<KeyButton>,
 }
 
 #[derive(Debug)]
 pub enum KeySeqInputMsg {
     SetSequence(Vec<KeyCode>),
     AddKey(KeyCode),
-    PopKey,
     ClearKeys,
+    RemoveKey(KeyCode),
 }
 
 impl KeySeqInput {
-    fn key_seq_to_string(&self) -> String {
-        let mut key_iter = self.sequence.iter();
-        let mut buf = String::new();
-        if let Some(key) = key_iter.next() {
-            buf.push_str(&format!("{}", EventCode::EV_KEY(key)));
-            for key in key_iter {
-                buf.push('+');
-                buf.push_str(&format!("{}", EventCode::EV_KEY(key)));
-            }
+    fn keys_factory_update(&mut self) {
+        let mut kfac = self.keys_factory.guard();
+        kfac.clear();
+        for key in self.sequence.iter() {
+            kfac.push_back(key);
         }
-        buf
     }
 }
 
@@ -54,15 +84,13 @@ impl SimpleComponent for KeySeqInput {
             set_orientation: gtk::Orientation::Horizontal,
             set_spacing: 6,
 
-            gtk::Entry {
-                #[watch]
-                set_text: &model.key_seq_to_string(),
-                set_hexpand: true,
-                set_editable: false,
-            },
-
-            gtk::Button::from_icon_name("edit-redo-symbolic-rtl") {
-                connect_clicked => KeySeqInputMsg::PopKey
+            gtk::ScrolledWindow {
+                set_policy: (gtk::PolicyType::Automatic, gtk::PolicyType::Never),
+                #[local_ref]
+                keys_factory_box -> gtk::Box {
+                    set_hexpand: true,
+                    set_spacing: 6,
+                },
             },
 
             gtk::DropDown::new(
@@ -91,10 +119,19 @@ impl SimpleComponent for KeySeqInput {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let keys =
+            FactoryVecDeque::builder()
+                .launch_default()
+                .forward(sender.input_sender(), |msg| match msg {
+                    KeyButtonOutput::Remove(key) => KeySeqInputMsg::RemoveKey(key),
+                });
+
         let model = Self {
             sequence: init.into(),
+            keys_factory: keys,
         };
 
+        let keys_factory_box = model.keys_factory.widget();
         let widgets = view_output!();
 
         ComponentParts { model, widgets }
@@ -108,12 +145,13 @@ impl SimpleComponent for KeySeqInput {
             KeySeqInputMsg::AddKey(k) => {
                 self.sequence.push(k);
             }
-            KeySeqInputMsg::PopKey => {
-                self.sequence.pop();
-            }
             KeySeqInputMsg::ClearKeys => {
                 self.sequence.clear();
             }
+            KeySeqInputMsg::RemoveKey(key) => {
+                self.sequence.remove(key);
+            }
         }
+        self.keys_factory_update()
     }
 }

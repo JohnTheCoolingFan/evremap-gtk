@@ -27,7 +27,9 @@ macro_rules! modkey_translate {
     }
 }
 
-const MODIFIERS: [KeyCode; 9] = [
+const MODIFIER_KEYS_AMOUNT: usize = 9;
+
+const MODIFIERS: [KeyCode; MODIFIER_KEYS_AMOUNT] = [
     KeyCode::KEY_FN,
     KeyCode::KEY_LEFTALT,
     KeyCode::KEY_RIGHTALT,
@@ -148,6 +150,20 @@ impl KeyCombination {
             .into_iter()
             .chain(self.keys.iter().copied())
             .collect()
+    }
+
+    pub fn remove_by_idx(&mut self, idx: usize) -> Option<KeyCode> {
+        let key = self.iter().nth(idx)?;
+        self.remove(key);
+        Some(key)
+    }
+
+    pub fn remove(&mut self, key: KeyCode) {
+        if self.modifiers.contains(key) {
+            self.modifiers.remove(key);
+        } else if let Some((idx, _)) = self.keys.iter().enumerate().find(|(_, k)| **k == key) {
+            self.keys.remove(idx);
+        }
     }
 }
 
