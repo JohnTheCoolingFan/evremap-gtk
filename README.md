@@ -14,5 +14,4 @@ deps note: GTK 4.16 or higher, targeting gnome api 46 (fedora stable, 41 at the 
 
 Set the following environment variables:
 
-- `G_MESSAGES_DEBUG=evremap_gtk` (required for glib logger to pass the rust messages)
 - `RUST_LOG=<level>`, where `<level>` is one of "off", "error", "warn", "info", "debug", "trace", case-insensitive and defaults to warn
