@@ -6,9 +6,9 @@ deps note: GTK 4.16 or higher, targeting gnome api 46 (fedora stable, 41 at the 
 
 # Screenshots
 
-![Editor screenshot](https://github.com/user-attachments/assets/b413057e-e4bb-415b-a9c2-025bbff06d02)
-![Device list screenshot](https://github.com/user-attachments/assets/9894d07f-922f-42b0-a49d-d009bccd0244)
-![Event logger screenshot](https://github.com/user-attachments/assets/0fd7b09d-6d61-4f23-91a7-1bf42adba9c9)
+![Editor screenshot](https://github.com/user-attachments/assets/6f32d34b-a693-42d4-b6af-1d30f30b3656)
+![Device list screenshot](https://github.com/user-attachments/assets/2d5dea8e-fadf-480a-9328-91d03ad206a2)
+![Event logger screenshot](https://github.com/user-attachments/assets/323c37f2-7fd5-4c22-995d-c15446ecee68)
 
 # Logging
 
