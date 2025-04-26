@@ -2,11 +2,14 @@ use evdev_rs::enums::EventCode;
 use gtk::prelude::*;
 use relm4::prelude::*;
 
-use crate::evdev_utils::{KeyCode, list_keycodes, list_keynames_iter};
+use crate::{
+    evdev_utils::{KeyCode, list_keycodes, list_keynames_iter},
+    key_combo::KeyCombination,
+};
 
 #[derive(Debug)]
 pub struct KeySeqInput {
-    pub sequence: Vec<KeyCode>,
+    pub sequence: KeyCombination,
 }
 
 #[derive(Debug)]
@@ -22,10 +25,10 @@ impl KeySeqInput {
         let mut key_iter = self.sequence.iter();
         let mut buf = String::new();
         if let Some(key) = key_iter.next() {
-            buf.push_str(&format!("{}", EventCode::EV_KEY(*key)));
+            buf.push_str(&format!("{}", EventCode::EV_KEY(key)));
             for key in key_iter {
                 buf.push('+');
-                buf.push_str(&format!("{}", EventCode::EV_KEY(*key)));
+                buf.push_str(&format!("{}", EventCode::EV_KEY(key)));
             }
         }
         buf
@@ -88,7 +91,9 @@ impl SimpleComponent for KeySeqInput {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Self { sequence: init };
+        let model = Self {
+            sequence: init.into(),
+        };
 
         let widgets = view_output!();
 
@@ -98,7 +103,7 @@ impl SimpleComponent for KeySeqInput {
     fn update(&mut self, message: Self::Input, _sender: ComponentSender<Self>) {
         match message {
             KeySeqInputMsg::SetSequence(seq) => {
-                self.sequence = seq;
+                self.sequence = seq.into();
             }
             KeySeqInputMsg::AddKey(k) => {
                 self.sequence.push(k);

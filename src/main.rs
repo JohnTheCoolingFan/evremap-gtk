@@ -19,13 +19,13 @@ use relm4_components::{
 
 mod components;
 mod evdev_utils;
+mod key_combo;
 
 mod config_file;
 mod deviceinfo;
 
 // TODO:
 //  - Warning if there are multiple devices with same name and phys is not set
-//  - Checking and formatting of key sequences/combinations like in evremap internally
 //  - Localized key names? Would be a big change, as a support for localizations woudl be needed,
 //    but in theory adding localizations of other parts of the application wouldn't be so hard after
 //    that. The biggest problem would be collecting enough localizations. For keys, there are
@@ -566,8 +566,8 @@ impl AppModel {
         self.remaps
             .iter()
             .map(|remap_item| RemapConfig {
-                input: remap_item.input_seq.model().sequence.clone(),
-                output: remap_item.output_seq.model().sequence.clone(),
+                input: remap_item.input_seq.model().sequence.to_keys(),
+                output: remap_item.output_seq.model().sequence.to_keys(),
             })
             .collect()
     }
@@ -577,8 +577,8 @@ impl AppModel {
             .iter()
             .map(|dual_role| DualRoleConfig {
                 input: dual_role.key,
-                hold: dual_role.hold_seq.model().sequence.clone(),
-                tap: dual_role.tap_seq.model().sequence.clone(),
+                hold: dual_role.hold_seq.model().sequence.to_keys(),
+                tap: dual_role.tap_seq.model().sequence.to_keys(),
             })
             .collect()
     }
