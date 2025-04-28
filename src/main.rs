@@ -1,4 +1,10 @@
-use std::{env::VarError, error::Error, path::PathBuf, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    env::VarError,
+    error::Error,
+    path::PathBuf,
+    str::FromStr,
+};
 
 use components::{
     device_browser::{DeviceDisplay, DeviceDisplayMsg, DeviceDisplayOutput},
@@ -25,7 +31,6 @@ mod config_file;
 mod deviceinfo;
 
 // TODO:
-//  - Warning if there are multiple devices with same name and phys is not set
 //  - Localized key names? Would be a big change, as a support for localizations woudl be needed,
 //    but in theory adding localizations of other parts of the application wouldn't be so hard after
 //    that. The biggest problem would be collecting enough localizations. For keys, there are
@@ -140,6 +145,7 @@ struct AppModel {
     open_dialog: Controller<OpenDialog>,
     save_dialog: Controller<SaveDialog>,
     device_browser: FactoryVecDeque<DeviceDisplay>,
+    duplicate_names: HashSet<String>,
     event_logger: Controller<EventLogger>,
     toaster: Toaster,
 }
@@ -226,11 +232,26 @@ impl Component for AppModel {
                         set_spacing: 12,
                         set_margin_all: 12,
 
-                        #[name = "device_name_entry"]
-                        gtk::Entry {
-                            set_placeholder_text: Some("Device name (required)"),
-                            set_buffer: &model.config.name,
-                            connect_changed => AppMsg::Ignore,
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 6,
+                            set_hexpand: true,
+                            #[name = "device_name_entry"]
+                            gtk::Entry {
+                            set_hexpand: true,
+                                set_placeholder_text: Some("Device name (required)"),
+                                set_buffer: &model.config.name,
+                                connect_changed => AppMsg::Ignore,
+                                #[watch]
+                                set_class_active: ("warning", model.should_display_name_warning()),
+                            },
+
+                            gtk::Image::from_icon_name("dialog-warning-symbolic") {
+                                #[watch]
+                                set_visible: model.should_display_name_warning(),
+                                set_margin_all: 6,
+                                set_tooltip_text: Some("Multiple devices with this name are currently connected\nSpecifying the phys is recommended")
+                            }
                         },
                         gtk::Entry {
                             set_placeholder_text: Some("Device phys (optional)"),
@@ -387,6 +408,7 @@ impl Component for AppModel {
             save_dialog,
             open_dialog,
             device_browser,
+            duplicate_names: HashSet::new(),
             event_logger,
             toaster: Toaster::default(),
         };
@@ -467,6 +489,23 @@ impl Component for AppModel {
     ) {
         match message {
             CommandMsg::UpdateDeviceList(devices) => {
+                // Update the list of device names that have multiple devices associated with them
+                let names_counts: HashMap<&str, usize> =
+                    devices
+                        .iter()
+                        .map(|d| &d.name)
+                        .fold(HashMap::new(), |mut acc, dname| {
+                            *acc.entry(dname).or_insert(0) += 1;
+                            acc
+                        });
+                self.duplicate_names.clear();
+                self.duplicate_names.extend(
+                    names_counts
+                        .into_iter()
+                        .filter(|&(_dname, count)| (count > 1))
+                        .map(|(dname, _count)| dname.to_owned()),
+                );
+                // Clear the device browser list and add each device
                 let mut device_list = self.device_browser.guard();
                 device_list.clear();
                 for dev in devices {
@@ -599,5 +638,13 @@ impl AppModel {
             .build();
         toast.connect_button_clicked(move |tst| tst.dismiss());
         self.toaster.add_toast(toast);
+    }
+
+    /// Display the warning about the device name if there are multiple devices with this name
+    /// connected AND phys is not specified.
+    fn should_display_name_warning(&self) -> bool {
+        self.duplicate_names
+            .contains(self.config.name.text().as_str())
+            && self.config.phys.text().is_empty()
     }
 }
