@@ -10,14 +10,13 @@ use components::{
     device_browser::{DeviceDisplay, DeviceDisplayMsg, DeviceDisplayOutput},
     dual_role::{DualRoleMapItem, DualRoleMapItemOutput},
     event_logger::{EventLogger, EventLoggerMsg, EventLoggerOutput},
-    key_seq::KeySeqInputMsg,
     remap::{RemapItem, RemapItemOutput},
 };
 use config_file::{ConfigFile, DualRoleConfig, RemapConfig};
 use deviceinfo::DeviceInfo;
 use gtk::{self, glib, prelude::*};
 use log::LevelFilter;
-use relm4::{abstractions::Toaster, adw, factory::FactoryVecDequeGuard, prelude::*};
+use relm4::{abstractions::Toaster, prelude::*};
 use relm4_components::{
     open_dialog::{OpenDialog, OpenDialogMsg, OpenDialogResponse, OpenDialogSettings},
     save_dialog::{SaveDialog, SaveDialogMsg, SaveDialogResponse, SaveDialogSettings},
@@ -65,8 +64,10 @@ fn init_logging() {
 }
 
 fn main() {
+    // Must be the first thing called in the app, see the safety comment in init_logging body
     init_logging();
     let app = RelmApp::new(APP_ID);
+    // Remove rounding on the device list refresh button
     relm4::set_global_css(
         ".device-list-refresh-button {
             border-bottom-left-radius: 0px;
@@ -173,6 +174,7 @@ enum AppMsg {
 }
 
 impl AppMsg {
+    /// Wrap an error with optional message into a [`AppMsg::ReportError`]
     pub fn err_msg<E: Error + Send + 'static, S: Into<String>>(e: E, msg: Option<S>) -> AppMsg {
         AppMsg::ReportError {
             error: Box::new(e),
@@ -480,28 +482,8 @@ impl Component for AppModel {
     ) {
         match message {
             CommandMsg::UpdateDeviceList(devices) => {
-                // Update the list of device names that have multiple devices associated with them
-                let names_counts: HashMap<&str, usize> =
-                    devices
-                        .iter()
-                        .map(|d| &d.name)
-                        .fold(HashMap::new(), |mut acc, dname| {
-                            *acc.entry(dname).or_insert(0) += 1;
-                            acc
-                        });
-                self.duplicate_names.clear();
-                self.duplicate_names.extend(
-                    names_counts
-                        .into_iter()
-                        .filter(|&(_dname, count)| (count > 1))
-                        .map(|(dname, _count)| dname.to_owned()),
-                );
-                // Clear the device browser list and add each device
-                let mut device_list = self.device_browser.guard();
-                device_list.clear();
-                for dev in devices {
-                    device_list.push_back(dev);
-                }
+                self.update_duplicate_names(&devices);
+                self.update_device_list(devices);
             }
             CommandMsg::DeviceListRefreshError(e) => sender.input(AppMsg::ReportError {
                 error: e,
@@ -512,6 +494,34 @@ impl Component for AppModel {
 }
 
 impl AppModel {
+    /// Update the list of device names that have multiple devices associated with them
+    fn update_duplicate_names(&mut self, devices: &[DeviceInfo]) {
+        let names_counts: HashMap<&str, usize> =
+            devices
+                .iter()
+                .map(|d| &d.name)
+                .fold(HashMap::new(), |mut acc, dname| {
+                    *acc.entry(dname).or_insert(0) += 1;
+                    acc
+                });
+        self.duplicate_names.clear();
+        self.duplicate_names.extend(
+            names_counts
+                .into_iter()
+                .filter(|&(_dname, count)| (count > 1))
+                .map(|(dname, _count)| dname.to_owned()),
+        );
+    }
+
+    /// Clear the device browser list and add each device
+    fn update_device_list(&mut self, devices: Vec<DeviceInfo>) {
+        let mut device_list = self.device_browser.guard();
+        device_list.clear();
+        for dev in devices {
+            device_list.push_back(dev);
+        }
+    }
+
     /// Load config data from a parsed config file
     fn load(&mut self, config_file: ConfigFile) {
         self.config.update_from_file(&config_file);
@@ -521,67 +531,17 @@ impl AppModel {
             dual_role: config_dual_role,
             remap: config_remap,
         } = config_file;
+
         let mut remaps = self.remaps.guard();
+        remaps.clear();
+        for remap in config_remap {
+            remaps.push_back(remap);
+        }
+
         let mut dual_role = self.dual_role_remaps.guard();
-        Self::truncate_remaps(&mut remaps, config_remap.len());
-        Self::truncate_dual_role(&mut dual_role, config_dual_role.len());
-        Self::set_remaps(&mut remaps, config_remap);
-        Self::set_dual_role(&mut dual_role, config_dual_role);
-    }
-
-    fn truncate_remaps(remaps: &mut FactoryVecDequeGuard<'_, RemapItem>, to_len: usize) {
-        if remaps.len() > to_len {
-            for _ in 0..(remaps.len() - to_len) {
-                remaps.pop_back();
-            }
-        }
-    }
-
-    fn truncate_dual_role(
-        dual_role: &mut FactoryVecDequeGuard<'_, DualRoleMapItem>,
-        to_len: usize,
-    ) {
-        if dual_role.len() > to_len {
-            for _ in 0..(dual_role.len() - to_len) {
-                dual_role.pop_back();
-            }
-        }
-    }
-
-    fn set_remaps(
-        remaps: &mut FactoryVecDequeGuard<'_, RemapItem>,
-        remaps_iter: impl IntoIterator<Item = RemapConfig>,
-    ) {
-        for (i, remap_config) in remaps_iter.into_iter().enumerate() {
-            if let Some(remap_item) = remaps.get_mut(i) {
-                remap_item
-                    .input_seq
-                    .emit(KeySeqInputMsg::SetSequence(remap_config.input));
-                remap_item
-                    .output_seq
-                    .emit(KeySeqInputMsg::SetSequence(remap_config.output));
-            } else {
-                remaps.push_back(remap_config);
-            }
-        }
-    }
-
-    fn set_dual_role(
-        dual_role: &mut FactoryVecDequeGuard<'_, DualRoleMapItem>,
-        dual_role_iter: impl IntoIterator<Item = DualRoleConfig>,
-    ) {
-        for (i, dual_role_config) in dual_role_iter.into_iter().enumerate() {
-            if let Some(dual_role_item) = dual_role.get_mut(i) {
-                dual_role_item.key = dual_role_config.input;
-                dual_role_item
-                    .hold_seq
-                    .emit(KeySeqInputMsg::SetSequence(dual_role_config.hold));
-                dual_role_item
-                    .tap_seq
-                    .emit(KeySeqInputMsg::SetSequence(dual_role_config.tap));
-            } else {
-                dual_role.push_back(dual_role_config);
-            }
+        dual_role.clear();
+        for dual_role_cfg in config_dual_role {
+            dual_role.push_back(dual_role_cfg);
         }
     }
 

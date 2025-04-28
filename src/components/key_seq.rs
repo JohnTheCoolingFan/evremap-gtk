@@ -49,7 +49,6 @@ pub struct KeySeqInput {
 
 #[derive(Debug)]
 pub enum KeySeqInputMsg {
-    SetSequence(Vec<KeyCode>),
     AddKey(KeyCode),
     ClearKeys,
     RemoveKey(KeyCode),
@@ -139,9 +138,6 @@ impl SimpleComponent for KeySeqInput {
 
     fn update(&mut self, message: Self::Input, _sender: ComponentSender<Self>) {
         match message {
-            KeySeqInputMsg::SetSequence(seq) => {
-                self.sequence = seq.into();
-            }
             KeySeqInputMsg::AddKey(k) => {
                 self.sequence.push(k);
             }
