@@ -30,15 +30,6 @@ mod key_combo;
 mod config_file;
 mod deviceinfo;
 
-// TODO:
-//  - Localized key names? Would be a big change, as a support for localizations would be needed,
-//    but in theory adding localizations of other parts of the application wouldn't be so hard after
-//    that. The biggest problem would be collecting enough localizations. For keys, there are
-//    probably pre-existing localizations, such as for GNOME's settings interface. Same could be
-//    said about the usual buttons such as "Save As" and "Open". The chances for finding good
-//    pre-existing localizations for other messages and labels are practically 0, and I can only
-//    provide english and russian myself.
-
 const APP_ID: &str = "ru.jtcf.evremap_gtk";
 
 /// Initialize logging for the `log` crate via glib's logging
