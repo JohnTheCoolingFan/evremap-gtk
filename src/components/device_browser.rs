@@ -48,9 +48,11 @@ impl FactoryComponent for DeviceDisplay {
 
                 attach[1,0,1,1] = &gtk::Label {
                     set_label: &self.device.name,
+                    set_tooltip_text: Some(&self.device.name),
                     set_selectable: true,
                     set_halign: gtk::Align::Start,
-                    set_hexpand: true
+                    set_hexpand: true,
+                    set_ellipsize: gtk::pango::EllipsizeMode::End,
                 },
 
                 attach[0,1,1,1] = &gtk::Label {
@@ -60,9 +62,11 @@ impl FactoryComponent for DeviceDisplay {
 
                 attach[1,1,1,1] = &gtk::Label {
                     set_label: self.device.phys.as_ref().map_or("(Missing)", |v| v),
+                    set_tooltip_text: self.device.phys.as_deref(),
                     set_selectable: self.device.phys.is_some(),
                     set_halign: gtk::Align::Start,
                     set_hexpand: true,
+                    set_ellipsize: gtk::pango::EllipsizeMode::End,
                 },
 
                 attach[0,2,1,1] = &gtk::Label {
@@ -72,9 +76,11 @@ impl FactoryComponent for DeviceDisplay {
 
                 attach[1,2,1,1] = &gtk::Label {
                     set_label: &format!("{}", self.device.path.display()),
+                    set_tooltip_text: Some(&format!("{}", self.device.path.display())),
                     set_selectable: self.device.phys.is_some(),
                     set_halign: gtk::Align::Start,
                     set_hexpand: true,
+                    set_ellipsize: gtk::pango::EllipsizeMode::End,
                 },
 
                 attach[2,0,1,3] = &gtk::Button::from_icon_name("object-select-symbolic") {

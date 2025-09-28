@@ -319,6 +319,7 @@ impl Component for AppModel {
 
                         gtk::ScrolledWindow {
                             set_vexpand: true,
+                            set_hscrollbar_policy: gtk::PolicyType::Never,
 
                             #[local_ref]
                             device_browser_box -> gtk::Box {
