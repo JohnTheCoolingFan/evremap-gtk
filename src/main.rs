@@ -509,7 +509,7 @@ impl AppModel {
         self.duplicate_names.extend(
             names_counts
                 .into_iter()
-                .filter(|&(_dname, count)| (count > 1))
+                .filter(|&(_dname, count)| count > 1)
                 .map(|(dname, _count)| dname.to_owned()),
         );
     }
