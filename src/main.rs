@@ -125,7 +125,10 @@ impl ConfigFileGtkBuf {
 #[derive(Debug)]
 enum CommandMsg {
     /// Update the list of devices in the browser
-    UpdateDeviceList(Vec<DeviceInfo>),
+    UpdateDeviceList {
+        devices: Vec<DeviceInfo>,
+        is_initial: bool,
+    },
     DeviceListRefreshError(Box<dyn Error + Send + 'static>),
 }
 
@@ -161,7 +164,9 @@ enum AppMsg {
     /// Copy the device's name and phys to the editor
     SetDevice(DeviceInfo),
     /// Request to update teh list of devices
-    RefreshDevices,
+    RefreshDevices {
+        is_initial: bool,
+    },
     /// Set the device for event logging
     SetLoggerDevice(DeviceInfo),
     /// Display an error in the UI
@@ -314,7 +319,7 @@ impl Component for AppModel {
                             set_tooltip_text: Some("Refresh device list"),
                             set_has_frame: false,
                             add_css_class: "device-list-refresh-button",
-                            connect_clicked => AppMsg::RefreshDevices,
+                            connect_clicked => AppMsg::RefreshDevices { is_initial: false },
                         },
 
                         gtk::ScrolledWindow {
@@ -393,7 +398,7 @@ impl Component for AppModel {
                 DeviceDisplayOutput::UseDeviceInLogger(dev) => AppMsg::SetLoggerDevice(dev),
             });
 
-        sender.input(AppMsg::RefreshDevices);
+        sender.input(AppMsg::RefreshDevices { is_initial: true });
 
         let model = Self {
             config: ConfigFileGtkBuf::default(),
@@ -422,8 +427,13 @@ impl Component for AppModel {
             AppMsg::Ignore => {}
             AppMsg::SaveRequest => self.save_dialog.emit(SaveDialogMsg::Save),
             AppMsg::SaveResponse(path) => {
-                if let Err(e) = self.to_config_file().save_to(path) {
+                if let Err(e) = self.to_config_file().save_to(&path) {
                     sender.input(AppMsg::err_msg(e, Some("Failed to save config file")))
+                } else {
+                    self.show_message_toast(format!(
+                        "Successfully saved config to {}",
+                        path.display()
+                    ));
                 }
             }
             AppMsg::OpenRequest => self.open_dialog.emit(OpenDialogMsg::Open),
@@ -448,18 +458,23 @@ impl Component for AppModel {
                 self.dual_role_remaps.guard().remove(index);
             }
             AppMsg::SetDevice(dev) => {
+                self.show_message_toast(format!("Selected config device \"{}\"", dev.name));
                 self.config.name.set_text(dev.name);
                 if let Some(devphys) = dev.phys {
                     self.config.phys.set_text(devphys);
                 }
             }
-            AppMsg::RefreshDevices => {
-                sender.spawn_oneshot_command(|| match DeviceInfo::obtain_device_list() {
-                    Ok(devices) => CommandMsg::UpdateDeviceList(devices),
+            AppMsg::RefreshDevices { is_initial } => {
+                sender.spawn_oneshot_command(move || match DeviceInfo::obtain_device_list() {
+                    Ok(devices) => CommandMsg::UpdateDeviceList {
+                        devices,
+                        is_initial,
+                    },
                     Err(e) => CommandMsg::DeviceListRefreshError(Box::new(e)),
                 });
             }
             AppMsg::SetLoggerDevice(dev) => {
+                self.show_message_toast(format!("Selected event logging device \"{}\"", dev.name));
                 self.event_logger.emit(EventLoggerMsg::SetDevice(dev));
             }
             AppMsg::ReportError {
@@ -482,9 +497,15 @@ impl Component for AppModel {
         _root: &Self::Root,
     ) {
         match message {
-            CommandMsg::UpdateDeviceList(devices) => {
+            CommandMsg::UpdateDeviceList {
+                devices,
+                is_initial,
+            } => {
                 self.update_duplicate_names(&devices);
                 self.update_device_list(devices);
+                if !is_initial {
+                    self.show_message_toast("Device list updated".to_owned());
+                }
             }
             CommandMsg::DeviceListRefreshError(e) => sender.input(AppMsg::ReportError {
                 error: e,
@@ -587,6 +608,16 @@ impl AppModel {
             .title(&error_msg)
             .button_label("Dismiss")
             .timeout(10)
+            .build();
+        toast.connect_button_clicked(move |tst| tst.dismiss());
+        self.toaster.add_toast(toast);
+    }
+
+    fn show_message_toast(&self, msg: String) {
+        let toast = adw::Toast::builder()
+            .title(msg)
+            .button_label("OK")
+            .timeout(5)
             .build();
         toast.connect_button_clicked(move |tst| tst.dismiss());
         self.toaster.add_toast(toast);
