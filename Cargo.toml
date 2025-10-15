@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-evdev-rs = { version = "0.6.1", features = ["serde"] }
-glib = { version = "0.20.9", features = ["log"] }
+evdev-rs = { version = "0.6.3", features = ["serde"] }
+glib = { version = "0.21.0", features = ["log"] }
 gtk = { version = "0.10.0", package = "gtk4", features = ["v4_18"]}
 log = "0.4.27"
 relm4 = { version = "0.10.0", features = ["gnome_48", "libadwaita"] }
 relm4-components = { version = "0.10.0", features = ["libadwaita"] }
 serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.12"
-toml = "0.8.20"
+toml = "0.9.8"
