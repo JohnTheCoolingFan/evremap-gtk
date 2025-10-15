@@ -67,15 +67,6 @@ fn main() {
     // Must be the first thing called in the app, see the safety comment in init_logging body
     init_logging();
     let app = RelmApp::new(APP_ID);
-    // Remove rounding on the device list refresh button
-    relm4::set_global_css(
-        ".device-list-refresh-button {
-            border-bottom-left-radius: 0px;
-            border-bottom-right-radius: 0px;
-            border-top-left-radius: 0px;
-            border-top-right-radius: 0px;
-        }",
-    );
     app.run::<AppModel>(());
 }
 
@@ -298,7 +289,7 @@ impl Component for AppModel {
                         set_orientation: gtk::Orientation::Vertical,
 
                         gtk::Box {
-                            set_orientation: gtk::Orientation::Vertical,
+                            set_orientation: gtk::Orientation::Horizontal,
                             set_spacing: 6,
                             set_margin_all: 6,
 
@@ -312,14 +303,16 @@ impl Component for AppModel {
                                         false => AppMsg::ShowHiddenDevices,
                                     })
                                 }
-                            }
-                        },
+                            },
 
-                        gtk::Button::from_icon_name("view-refresh-symbolic") {
-                            set_tooltip_text: Some("Refresh device list"),
-                            set_has_frame: false,
-                            add_css_class: "device-list-refresh-button",
-                            connect_clicked => AppMsg::RefreshDevices { is_initial: false },
+                            gtk::Button::from_icon_name("view-refresh-symbolic") {
+                                set_tooltip_text: Some("Refresh device list"),
+                                set_has_frame: false,
+                                add_css_class: "device-list-refresh-button",
+                                connect_clicked => AppMsg::RefreshDevices { is_initial: false },
+                                set_halign: gtk::Align::End,
+                                set_hexpand: true,
+                            },
                         },
 
                         gtk::ScrolledWindow {
