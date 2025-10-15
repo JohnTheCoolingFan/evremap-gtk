@@ -242,12 +242,33 @@ impl Component for AppModel {
                                 set_tooltip_text: Some("Multiple devices with this name are currently connected\nSpecifying the phys is recommended")
                             }
                         },
+
                         gtk::Entry {
                             set_placeholder_text: Some("Device phys (optional)"),
                             set_buffer: &model.config.phys,
                         },
 
-                        gtk::Separator::new(gtk::Orientation::Horizontal),
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 6,
+
+                            gtk::Label {
+                                set_text: "Remap",
+                            },
+
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                                set_valign: gtk::Align::Center,
+
+                                gtk::Separator::new(gtk::Orientation::Horizontal) {
+                                    set_hexpand: true
+                                }
+                            },
+
+                            gtk::Button::from_icon_name("list-add-symbolic") {
+                                connect_clicked => AppMsg::AddRemap
+                            }
+                        },
 
                         gtk::ScrolledWindow {
                             set_vexpand: true,
@@ -255,22 +276,32 @@ impl Component for AppModel {
                                 set_orientation: gtk::Orientation::Vertical,
                                 set_spacing: 12,
 
-                                gtk::Button {
-                                    set_label: "Add remap",
-                                    connect_clicked => AppMsg::AddRemap,
-                                },
-
                                 #[local_ref]
                                 remaps_box -> gtk::Box {
                                     set_orientation: gtk::Orientation::Vertical,
                                     set_spacing: 6,
                                 },
 
-                                gtk::Separator::new(gtk::Orientation::Horizontal),
+                                gtk::Box {
+                                    set_orientation: gtk::Orientation::Horizontal,
+                                    set_spacing: 6,
 
-                                gtk::Button {
-                                    set_label: "Add dual-role remap",
-                                    connect_clicked => AppMsg::AddDualRoleRemap,
+                                    gtk::Label {
+                                        set_text: "Dual-role",
+                                    },
+
+                                    gtk::Box {
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_valign: gtk::Align::Center,
+
+                                        gtk::Separator::new(gtk::Orientation::Horizontal) {
+                                            set_hexpand: true
+                                        }
+                                    },
+
+                                    gtk::Button::from_icon_name("list-add-symbolic") {
+                                        connect_clicked => AppMsg::AddDualRoleRemap
+                                    }
                                 },
 
                                 #[local_ref]
