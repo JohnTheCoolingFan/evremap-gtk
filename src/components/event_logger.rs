@@ -106,7 +106,8 @@ impl Component for EventLogger {
                                 set_label: &dev.device.name,
                                 set_selectable: true,
                                 set_halign: gtk::Align::Start,
-                                set_hexpand: true
+                                set_hexpand: true,
+                                set_ellipsize: gtk::pango::EllipsizeMode::End
                             },
 
                             attach[0,1,1,1] = &gtk::Label {
@@ -121,6 +122,7 @@ impl Component for EventLogger {
                                 set_selectable: dev.device.phys.is_some(),
                                 set_halign: gtk::Align::Start,
                                 set_hexpand: true,
+                                set_ellipsize: gtk::pango::EllipsizeMode::End
                             },
 
                             attach[0,2,1,1] = &gtk::Label {
@@ -135,6 +137,7 @@ impl Component for EventLogger {
                                 set_selectable: dev.device.phys.is_some(),
                                 set_halign: gtk::Align::Start,
                                 set_hexpand: true,
+                                set_ellipsize: gtk::pango::EllipsizeMode::End
                             },
                         }
                     },
