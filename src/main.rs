@@ -14,7 +14,7 @@ use components::{
 };
 use config_file::{ConfigFile, DualRoleConfig, RemapConfig};
 use deviceinfo::DeviceInfo;
-use gtk::{self, glib, prelude::*};
+use gtk::{self, prelude::*};
 use log::LevelFilter;
 use relm4::{abstractions::Toaster, prelude::*};
 use relm4_components::{
