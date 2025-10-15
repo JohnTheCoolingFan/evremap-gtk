@@ -65,6 +65,8 @@ impl Component for EventLogger {
                     set_icon_name: "media-playback-start-symbolic",
                     #[watch]
                     set_active: !model.is_paused,
+                    #[watch]
+                    set_sensitive: model.device.is_some(),
                     connect_toggled[sender] => move |tb| {
                         if !tb.is_active() {
                             sender.input(EventLoggerMsg::Pause)
@@ -76,11 +78,15 @@ impl Component for EventLogger {
 
                 gtk::Button::from_icon_name("edit-clear-symbolic") {
                     set_tooltip_text: Some("Clear event log"),
+                    #[watch]
+                    set_sensitive: model.device.is_some(),
                     connect_clicked => EventLoggerMsg::Clear,
                 },
 
                 gtk::Button::from_icon_name("edit-delete-symbolic") {
                     set_tooltip_text: Some("Clear device"),
+                    #[watch]
+                    set_sensitive: model.device.is_some(),
                     connect_clicked => EventLoggerMsg::ClearDevice,
                 }
             },
